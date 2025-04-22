@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-after
+spec:
+  # storage.objectViewer(Storage オブジェクト閲覧者)を紐付けたServiceAccountを指定
+  serviceAccountName: gke-wakaran-handson-sa  
+  containers:
+  - name: cloud-sdk
+    image: google/cloud-sdk:slim
+    command: ["sleep","infinity"]
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
