@@ -82,7 +82,7 @@ Once finished, enter the verification code provided in your browser:
 認証コードが表示されるため、これをコピーしてターミナルに戻り、ペーストします。
 ![alt text](images/image-login5.png)
 
-また、今回のハンズオン環境はQwiklabを使用おりあらかじめプロジェクトが作成されているため、以下のように既に作成済のプロジェクトを選択します。
+また、今回のハンズオン環境はQwiklabを使用しておりあらかじめプロジェクトが作成されているため、以下のように作成済のプロジェクトを選択します。
 (Qwiklab以外の環境を使用してハンズオンを実施する場合は[こちら](./docs/create-new-project.md)を参考にハンズオン用のプロジェクトを作成してください。)
 ```bash
 Go to the following link in your browser, and complete the sign-in prompts:
@@ -110,7 +110,7 @@ You can change it by running [gcloud config set compute/zone NAME].
 
 
 ### 0-3. プロジェクトIDの確認
-以下のコマンドを実行し、現在gcloudコマンドに設定されているプロジェクトを確認します。
+以下のコマンドを実行し、`gcloud`コマンドに設定されているプロジェクトを確認します。
 
 ```bash
 gcloud config list
@@ -122,7 +122,7 @@ project = qwiklabs-gcp-xxxxxxx
 ```
 
 
-以下のコマンドを実行し、ハンズオンに使用するプロジェクトの`PROJECT_ID`と`PROJECT_NUMBER`を確認します。  
+以下のコマンドを実行し、ハンズオンに使用するプロジェクトの`PROJECT_ID`を確認します。  
 ※`PROJECT_ID`はプロジェクトを識別するためのグローバルに一意なIDです。([参考](https://cloud.google.com/resource-manager/docs/creating-managing-projects?hl=ja))
 
 ```bash
@@ -135,11 +135,10 @@ PROJECT_ID           NAME                   PROJECT_NUMBER
 ```
 
 ### 0-4. 環境変数の設定
-以下のコマンドを用いて、環境変数を設定します。
-
+以下のコマンドを用いて、環境変数に各種値を設定します。
 ```bash
 export GCLOUD_PROJECT_ID=<PROJECT_ID>
-export GCLOUD_PROJECT_NUMBER=<PROJECT_NUMBER>
+export GCLOUD_PROJECT_NUMBER=`gcloud projects describe $GCLOUD_PROJECT_ID --format='value(projectNumber)'`
 export GCLOUD_REGION=asia-northeast1
 export CLUSTER_NAME=gke-wakaran-handson-cluster
 export REPOSITORY_ID=gke-wakaran-handson-repository
@@ -185,19 +184,19 @@ Qwiklab以外の環境で実施する場合の手順は[こちら](./docs/enable
 現在有効化されているサービスAPIの一覧は`gcloud services list`コマンドで確認できます。
 以下のコマンドを実行し、今回使用する各サービスAPIが有効化されていることを確認します。
 ```bash
-gcloud services list | grep -w compute.googleapis.com 
-gcloud services list | grep -w container.googleapis.com
-gcloud services list | grep -w iamcredentials.googleapis.com 
-gcloud services list | grep -w artifactregistry.googleapis.com
-gcloud services list | grep -w storage.googleapis.com
+gcloud services list | grep -Ew \
+'compute.googleapis.com|'\
+'container.googleapis.com|'\
+'iamcredentials.googleapis.com|'\
+'artifactregistry.googleapis.com|'\
+'storage.googleapis.com'
 ```
-
 ```bash
-compute.googleapis.com              Compute Engine API
-container.googleapis.com            Kubernetes Engine API
-iamcredentials.googleapis.com       IAM Service Account Credentials API
-artifactregistry.googleapis.com     Artifact Registry API
-storage.googleapis.com              Cloud Storage API
+artifactregistry.googleapis.com           Artifact Registry API
+compute.googleapis.com                    Compute Engine API
+container.googleapis.com                  Kubernetes Engine API
+iamcredentials.googleapis.com             IAM Service Account Credentials API
+storage.googleapis.com                    Cloud Storage API
 ```
 
 ## 1. Google Cloudリソースの作成
@@ -509,37 +508,13 @@ NAME         READY   STATUS    RESTARTS   AGE
 pod-before   1/1     Running   0          47s
 ```
 
-デプロイした`Pod`に接続します。
+`Pod`内で`gcloud storage ls`コマンドを実行してバケット内のオブジェクトを参照しようとすると、権限エラーによりオブジェクトの参照が行えないことが確認できます。
 ```bash
-kubectl exec -it pod-before -- /bin/bash
+kubectl exec -it pod-before -- gcloud storage ls gs://${STORAGE_BUCKET_NAME}
 ```
-
-以下のコマンドを実行してバケット内のオブジェクトを参照しようとすると、エラーとなり参照できないことが確認できます。  
-※URLの`xxxxx`の部分はご自身のバケット名と同じ値に置き換えてください。
-```bash
-# Pod内で操作
-curl -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    "https://storage.googleapis.com/storage/v1/b/gke-wakaran-handson-bucket-xxxxx/o"
 ```
-```bash
-{
-  "error": {
-    "code": 403,
-    "message": "Caller does not have storage.objects.list access to the Google Cloud Storage bucket. Permission 'storage.objects.list' denied on resource (or it may not exist).",
-    "errors": [
-      {
-        "message": "Caller does not have storage.objects.list access to the Google Cloud Storage bucket. Permission 'storage.objects.list' denied on resource (or it may not exist).",
-        "domain": "global",
-        "reason": "forbidden"
-      }
-    ]
-  }
-```
-
-`Pod`との接続を解除します。
-```bash
-# Pod内で操作
-exit
+ERROR: (gcloud.storage.ls) [<PROJECT_ID>.svc.id.goog] does not have permission to access b instance [gke-wakaran-handson-bucket-xxxxx] (or it may not exist): Caller does not have storage.objects.list access to the Google Cloud Storage bucket. Permission 'storage.objects.list' denied on resource (or it may not exist). This command is authenticated as <PROJECT_ID>.svc.id.goog which is the active account specified by the [core/account] property.
+command terminated with exit code 1
 ```
 
 ### 5-3. ServiceAccountにロールを紐付けた場合
@@ -608,38 +583,12 @@ NAME        READY   STATUS    RESTARTS   AGE
 pod-after   1/1     Running   0          105s
 ```
 
-デプロイした`Pod`に接続します。
+先ほどと同様に`Pod`内で`gcloud storage ls`コマンドを実行すると、今回はバケット内のオブジェクトが参照できることが確認できます。
 ```bash
-kubectl exec -it pod-after -- /bin/bash
+kubectl exec -it pod-after -- gcloud storage ls gs://${STORAGE_BUCKET_NAME}
 ```
-
-以下のコマンドを実行すると、バケット内のオブジェクトが参照できることが確認できます。  
-※URLの`xxxxx`の部分はご自身のバケット名と同じ値に置き換えてください。
-```bash
-# Pod内で操作
-curl -X GET -H "Authorization: Bearer $(gcloud auth print-access-token)" \
-    "https://storage.googleapis.com/storage/v1/b/gke-wakaran-handson-bucket-xxxxx/o"
 ```
-```bash
-    "https://storage.googleapis.com/storage/v1/b/gke-wakaran-handson-bucket-bqfce/o"
-{
-  "kind": "storage#objects",
-  "items": [
-    {
-      "kind": "storage#object",
-      ...
-      "name": "test.txt",
-      "bucket": "gke-wakaran-handson-bucket-xxxxx",
-      ...
-    }
-  ]
-}
-```
-
-`Pod`との接続を解除します。
-```bash
-# Pod内で操作
-exit
+gs://gke-wakaran-handson-bucket-xxxxx/test.txt
 ```
 
 ## 6. クリーンアップ
